@@ -1,0 +1,263 @@
+---
+title: "centrality"
+output: html_document
+---
+```{r}
+library("readxl")
+library("dplyr")
+library("emmeans")
+library("car")
+library("ggplot2")
+library("simr")
+options(warn=-1)
+pacman::p_load(svglite,ggbeeswarm,gridExtra,dplyr, ggpubr, car, ggeffects, ggplot2, knitr, lme4, readxl, tibble, afex, nonnest2, lmtest, cowplot)
+# function to reformat the lmer outcomes
+coef.format <- function(object) {
+  sc <- fixef(object)
+  se <- coef(summary(object))[,"Std. Error"]
+  result = data.frame(coef=sc, se=se)
+  result$lower = result$coef-result$se*1.96
+  result$upper = result$coef+result$se*1.96
+  result$upper<-format(round(result$upper,2),nsmall=2)
+  result$lower<-format(round(result$lower,2),nsmall=2)
+  result$coef<-format(round(result$coef,2),nsmall=2)
+  return(result)
+}
+```
+
+```{r}
+ data = read_excel('C:/users/hchen/Dropbox/PycharmProjects/false_mem/C. script_LMM/data_sheets/semantic_measures_0819b.xlsx',.name_repair = "universal" )
+data$story_id = factor(data$story_id)
+data$par_id = factor(data$par_id)
+data$centrality = scale(data$centrality)
+data$prior = scale(data$prior)
+data$PPL_context = scale(data$PPL_context)
+  
+data <- data %>%
+  group_by(story_id) %>%
+  mutate(event_location = event_id / max(event_id)) %>%
+  ungroup()
+data$event_location = scale(data$event_location)
+data$length = scale(data$length)
+data$conflict = recode_data <- ifelse(is.na(data$conflict), NA, ifelse(data$conflict == 0, 1, ifelse(data$conflict == 1, 0, data$conflict)))
+
+# data filled na with 0
+data_fill =  replace(data, is.na(data), 0)
+data_fill =  as.data.frame(data_fill)
+
+# data with only the recalled trials
+data_wrong=data[!is.na(data$false),]
+```
+# confict
+```{r}
+model_conflict = glmer(conflict ~ centrality+PPL_context+prior+length+event_location+(1|story_id)+(1|par_id), data = data_wrong,family = binomial(link = "logit"),control=glmerControl(optimizer="bobyqa"))
+summary(model_conflict)
+anova(model_conflict)
+vif(model_conflict)
+coef.format(model_conflict)
+```
+# confab
+```{r}
+model_confab = glmer(confab ~ centrality +PPL_context+prior+length+event_location+(1|story_id)+(1|par_id), data = data_wrong,family = binomial(link = "logit"),control = glmerControl(optimizer = "bobyqa", optCtrl=list(maxfun=2e7)))
+summary(model_confab)
+anova(model_confab)
+vif(model_confab)
+coef.format(model_confab)
+
+```
+# recall rate
+```{r}
+model_recall = glmer(recall ~ centrality+PPL_context+prior+length+event_location+(1|story_id)+(1|par_id), data = data,family = binomial(link = "logit"),control=glmerControl(optimizer="bobyqa"))
+summary(model_recall)
+anova(model_recall)
+coef.format(model_recall)
+
+```
+# inference
+```{r}
+model_infer = glmer(inference ~ centrality+PPL_context+prior+length+event_location+(1|story_id)+(1|par_id), data = data,family = binomial(link = "logit"),control=glmerControl(optimizer="bobyqa"))
+summary(model_infer)
+anova(model_infer)
+```
+# plot the separate models
+```{r}
+library(patchwork)
+
+extract_coefs <- function(model) {
+  s <- summary(model)
+  coefs <- s$coefficients  # matrix of fixed-effect terms
+  
+  df <- data.frame(
+    term     = rownames(coefs),
+    Estimate = coefs[, "Estimate"],
+    SE       = coefs[, "Std. Error"],
+    pval     = coefs[, "Pr(>|z|)"]*4,
+    stringsAsFactors = FALSE
+  )
+  
+  # Exclude intercept if desired
+  df <- df[df$term != "(Intercept)", ]
+  df <- df[df$term != "length", ]
+
+  # Significance stars
+  df$stars <- ifelse(df$pval < 0.001, "***",
+              ifelse(df$pval < 0.01,  "**",
+              ifelse(df$pval < 0.05,  "*",
+              ifelse(df$pval < 0.1,   ".", ""))))
+  
+  # Position to place star above/below the bar
+  df$star_y <- ifelse(df$Estimate > 0,
+                      df$Estimate + df$SE + 0.04,  # above for positive
+                      df$Estimate - df$SE - 0.05)  # below for negative
+  
+  return(df)
+}
+make_bar_plot <- function(mod, model_title = "", remove_x = FALSE,
+                          my_colors = NULL, bar_width = 0.7, ymax=0.38, show_legend = FALSE) {
+  
+  df <- extract_coefs(mod)
+  
+  # Reorder/rename your factors if desired
+  df$term <- factor(df$term,
+                    levels = c("centrality", "prior", "PPL_context","event_location","length"), 
+  labels = c("semantic centrality", "sim. to prior corpus", "contextual surprisal","serial position","event length"))
+  
+  # Build the ggplot
+  p <- ggplot(df, aes(x = term, y = Estimate, fill = term)) +
+    # Bars
+    geom_col(width = bar_width, show.legend = show_legend, alpha=0.7) +
+    
+    # Error bars (+/- 1 SE here, or use 1.96*SE for ~95% CI)
+    geom_errorbar(aes(ymin = Estimate - 1.96*SE, ymax = Estimate + 1.96*SE),
+                  width = 0.1) +
+    # Horizontal line
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+    
+    # range of y
+    ylim(-0.25, ymax) +
+
+    # Significance stars
+    geom_text(aes(label = stars, y = star_y),
+              vjust = ifelse(df$Estimate > 0, 0, 1), # anchor above or below
+              size = 5) +
+    
+    # Manual fill colors if provided
+   (if (!is.null(my_colors)) scale_fill_manual(
+  name = NULL,
+  values = my_colors,
+  guide = guide_legend(direction = "horizontal")) else NULL) +
+    
+    # Title and theme
+    ggtitle(model_title) +
+    theme_classic() +  # Start with theme_classic
+    
+    # Remove facet strips or boxes if you had used facet (not needed here).
+    # But if you want no "box" behind the title, do:
+    theme(
+      # No box around the main title:
+      plot.title = element_text(
+        # face="bold", size=14, etc. if you want
+        size = 10,
+        margin = margin(b = 10)  # some spacing below the title
+      ),
+      # Control axis text font/size
+      axis.text.x = element_text(size = 8),  # e.g. size=12
+      axis.text.y = element_text(size=6.5),
+      
+      # Control axis title font/size
+      axis.title.x = element_text(size=8),
+      axis.title.y = element_text(size=8)
+    ) +
+    
+    xlab("Predictors of interest") +
+    ylab("Betas")
+  
+  # Optionally remove x-axis text/ticks/label if this is a "top" plot
+  # and you only want x-axis on the bottom plot.
+  if (remove_x) {
+    p <- p + theme(
+      axis.text.x  = element_blank(),
+      axis.ticks.x = element_blank()
+    )
+  }
+  
+  return(p)
+}
+
+###############################################################################
+# 5. Make four separate plots (one per model), stacking them with patchwork
+###############################################################################
+# You can define a consistent color scheme for the bars across models:
+my_colors <- c("semantic centrality" = "#b179ea",  # example color
+               "sim. to prior corpus" = "#56B4E9",
+               "contextual surprisal" = "#009E73",
+               "serial position" = "#555555",
+               "event length" = "#999999")
+
+bar_width = 0.6
+# top plots: remove_x = TRUE so they have no x-axis
+p1 <- make_bar_plot(model_recall, "Recall rate", remove_x = TRUE,  my_colors = my_colors, bar_width = bar_width)
+#p2 <- make_bar_plot(model_false, "False memory rate", remove_x = TRUE,  my_colors = my_colors, bar_width = bar_width)
+p3 <- make_bar_plot(model_conflict, "Factual error rate", remove_x = TRUE,  my_colors = my_colors, bar_width = bar_width)
+
+# bottom plot: remove_x = FALSE so it shows x-axis
+p4 <- make_bar_plot(model_confab, "Confabulation rate", remove_x = TRUE, my_colors = my_colors, bar_width = bar_width,show_legend=TRUE)
+
+#p5 <- make_bar_plot(model_infer, "Inference rate", remove_x = FALSE, my_colors = my_colors, bar_width = bar_width, show_legend=TRUE)
+
+# Combine them vertically with patchwork
+p_combined <- p1 + p3 + p4 + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+# Plot it
+p_combined
+```
+```{r}
+ggsave(plot = p_combined, width = 7, height = 2.4, dpi = 300, filename = "C:/Users/hchen/Dropbox/PycharmProjects/false_mem/figures/svg/fixedEffects_legend.png")
+```
+
+###### multivariate model
+
+```{r}
+library(MCMCglmm)
+
+# Suppose your data frame is called df_wide, with columns:
+# df_wide$Y1, df_wide$Y2, df_wide$Y3, df_wide$Y4, A, B, C, Subject
+
+# We want 4 Gaussian responses
+n_outcomes <- 4
+
+# Prior: we allow an unstructured (co)variance for both G (random) and R (residual) 
+# Very loose/informative prior for illustration
+prior_mv <- list(
+  R = list(
+    V = diag(n_outcomes),  # for 4 outcomes
+    nu = 1
+  ),
+  G = list(
+    G1 = list(V = diag(n_outcomes), nu = 2),  # matches us(trait):Subject
+    G2 = list(V = diag(n_outcomes), nu = 2)   # matches us(trait):Item
+  )
+)
+
+fixed_formula <- cbind(recall,false,confab,conflict) ~ trait - 1 + 
+    trait:centrality+trait:PPL_context+trait:prior+trait:length+trait:event_location
+random_formula <-  ~ us(trait):par_id + us(trait):story_id
+
+# Model:
+m_mv <- MCMCglmm(
+  fixed = fixed_formula,  
+  random = random_formula,  # unstructured covariance among the 4 traits by Subject
+  rcov   = ~ idh(trait):units,    # unstructured residual covariance among the 4 traits
+  family = rep("threshold", n_outcomes) ,
+  data   = data_fill,
+  prior  = prior_mv,
+  nitt   = 30000,     # Increase for real data
+  burnin = 5000,      # Increase for real data
+  thin   = 10
+)
+
+summary(m_mv)
+
+```
+
