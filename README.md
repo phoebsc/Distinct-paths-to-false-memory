@@ -2,11 +2,13 @@
 ---
 This repository implements the analysis pipeline for paper [Distinct paths to false memory revealed in hundreds of narrative recalls](https://osf.io/sfqea_v1).
 
+Human data used for analysis are hosted separately on the [OSF repo](https://osf.io/cmxae/).
+
 Authors: Phoebe Chen, Omri Raccah (co-first), Vy Vo, David Poeppel, Todd Gureckis
 
 ---
 
-## 🧠 `A. script_prompting/`
+## 📊 `A. script_prompting/`
 
 This folder contains all scripts for the **LLM-based Annotation Pipeline**.
 It transforms raw recall transcripts into structured model outputs.
@@ -27,6 +29,13 @@ It transforms raw recall transcripts into structured model outputs.
 ### File
 
 * **`read_GPT_output.py`** — Merges the GPT outputs, extracts categorical labels, populates analysis arrays, and stores them in `GPT_output/results_arrays`.
+
+---
+## 📊 `C. human_validation/`
+### File
+
+* **`data_analysis_experiment_1.py`** — Extracts data from `Experiment_1/` and analyzes it for human validation of AI classifications.
+* **`data_analysis_experiment_2.py`** — Extracts data from `Experiment_2/` and analyzes it for human validation of AI classifications. 
 
 ---
 
@@ -60,13 +69,22 @@ This folder contains scripts for **integrating semantic features with behavioral
 
 ## 📁 `GPT_output/`
 
-This folder stores **model-generated outputs** from the prompting and classification stages.
+This folder is hosted seperately on the [OSF repo](https://osf.io/cmxae/), and stores **model-generated outputs** from the prompting and classification stages.
 
 ### Subfolders
 
 * **`memory_classification/{story}/`** — Per-story Excel outputs from the memory classification task.
 * **`event_matching/{story}/`** — Event-indexed outputs from the event matching task.
 * **`results_arrays/`** — NumPy arrays summarizing confabulation, factual errors, and inference presence per participant and event.
+---
+## 📁 `Experiment_1/` and `Experiment_2/`
+
+These folders are hosted seperately on the [OSF repo](https://osf.io/cmxae/), and stores **Human Validation Experiment** data and stimuli from two experiments.
+
+### Subfolders
+
+* **`data`** — .json files storing participant responses.
+* **`stimuli_sheets`** — Excel files containing questions used for each story.
 ---
 
 ## 🧩 `semantic_features/`
