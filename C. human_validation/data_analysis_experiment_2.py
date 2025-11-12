@@ -1,17 +1,15 @@
 import json
 import pandas as pd
 import numpy as np
-filename = './D. human_validation/validation_exp_Feb2025/data/storycomprehension-default-rtdb-export_0327.json'
-roster = pd.read_csv('./D. human_validation/validation_exp_Feb2025/data/roster_download_1644.csv',header=0)
-roster['survey_id'] = roster['survey_id'].astype(str)
-roster_names = roster['survey_id'].to_list()
+filename = 'PATH_TO/Experiment_2/data/experiment2_data.json'
+stimulus_path = 'PATH_TO/Experiment_2/stimuli_sheets'
 f = open(filename,)
 data = json.load(f)
 mapping_trial_number = {'pieman':7,'eyespy':9,'oregontrail':9,'baseball':9}
 mapping_length = {'pieman':8*60+22,'eyespy':13*60 ,'oregontrail':12*60+23,'baseball':12*60+48}
 
 # read data
-subs = [x for x in list(data.keys()) if x in roster_names]
+subs = list(data.keys())
 df = pd.DataFrame(columns=['participant','story','question_id','question','answer'])
 n=0
 sub_questions = []
@@ -43,7 +41,7 @@ for sub in subs:
 df_original = pd.DataFrame(columns=['story','question_id','ground','flag'])
 story_ids = ['pieman','eyespy','oregontrail','baseball']
 for story_id in story_ids:
-    trial_excel = pd.read_excel('./D. human_validation/validation_exp_Feb2025/trial_excels/%s_agreement.xlsx' % story_id)
+    trial_excel = pd.read_excel(os.path.join(stimulus_path,'/%s.xlsx' % story_id))
     trial_excel['question_id'] = 'excel_id'+trial_excel['ID'].astype(int).astype(str)
     trial_excel['story'] = story_id
     trial_excel['ground'] = trial_excel['Ground']
@@ -82,109 +80,6 @@ df = df.loc[~df.participant.isin(remove)]
 df.groupby('story')['participant'].nunique()
 # remove attention trials
 df = df[df['qid_num'] < 50]
-
-# remove some trials due to errors
-df = df.loc[~((df.story=='oregontrail') & (df.question_id.astype(str).str.endswith(('35', '41'))))]
-
-"""
-demographic after exclusion
-"""
-par_list = pd.read_csv('./D. human_validation/validation_exp_Feb2025/data/prescreen_data.csv')
-roster = pd.read_csv('./D. human_validation/validation_exp_Feb2025/data/roster_download_1644.csv')[['login_id','survey_id']]
-par_list = pd.merge(par_list,roster,how='left',on='login_id')
-par_list = par_list.loc[~par_list.survey_id.isna()]
-par_list.survey_id = par_list.survey_id.astype(int).astype(str)
-sub_list = par_list.loc[par_list.survey_id.isin(np.unique(df.participant))]
-
-sub_list['age'] = 2025 - pd.to_numeric(sub_list['BirthDate'].str.split('/', expand=True)[2], errors='coerce')
-age = [x for x in sub_list['age'].to_list() if x>0]
-print('age mean', np.mean(age), 'std', np.std(age))
-print('gender', sub_list['GenderNow'].value_counts())
-"""
-check agreements with AI
-"""
-def agreement(subdf):
-    subdf['flag'] = subdf['flag'].replace({'x': 1}).fillna(0)
-
-    return pd.Series(dict(agree=np.sum(subdf['agreeAI'])/len(subdf),
-                          subn=len(subdf),
-                          flag=np.mean(subdf['flag']),
-                          type_of_error=subdf['type of error'].to_list()[0]))
-
-# simple agreement
-df_agree = df.groupby(['story','question_id']).apply(agreement)
-df_agree['agree'].mean()  # avg all ppl
-
-# split errors
-for story_id in story_ids:
-    print(story_id,df_agree.loc[story_id].groupby('type_of_error')['agree'].mean())
-df_agree_per_story = df.groupby(['story','type of error']).apply(agreement)
-print('averaging four stories')
-print('confab',(df_agree_per_story.iloc[0,0]+df_agree_per_story.iloc[2,0]+df_agree_per_story.iloc[4,0]+
-                     df_agree_per_story.iloc[6,0])/4)
-print('conflict',(df_agree_per_story.iloc[1,0]+df_agree_per_story.iloc[3,0]+df_agree_per_story.iloc[5,0]+
-                       df_agree_per_story.iloc[7,0])/4)
-print("averaging all ppl", df_agree.groupby('type_of_error')['agree'].mean())
-
-# group errors
-story_agreement = []
-for story_id in story_ids:
-    agg = df_agree.loc[story_id]['agree'].mean()
-    print(story_id,agg)
-    story_agreement.append(agg)
-# avg 4 stories
-print('averaging four stories', np.mean(story_agreement), "averaging all ppl", df_agree['agree'].mean())
-
-# for story_id in story_ids:
-#     plt.figure()
-#     plt.bar(np.arange(len(df_agree.loc[story_id]['agree'])),df_agree.loc[story_id]['agree'])
-#     plt.scatter(np.arange(len(df_agree.loc[story_id]['agree'])),df_agree.loc[story_id]['flag'])
-#     plt.title(story_id)
-#     plt.ylabel('agreement with AI')
-#     plt.xlabel('questions')
-#     plt.show()
-#     print(df_agree.loc[story_id]['agree'].mean())
-
-"""
-correlation between subjects on their answers
-"""
-def sub_simpleMatch(subdf):
-    df_wide = subdf.pivot(index='question_id', columns='participant', values='agreeAI')
-    ratings = df_wide.to_numpy().T.astype(int)
-
-    n_raters = ratings.shape[0]
-    pairwise_smc_values = {}
-    # Compute pairwise SMC for each (i, j) pair of raters
-    for i, j in combinations(range(n_raters), 2):
-        rater_i = ratings[i]
-        rater_j = ratings[j]
-        # SMC is the fraction of items where rater_i == rater_j
-        smc_value = np.mean(rater_i == rater_j)
-        pairwise_smc_values[(i, j)] = smc_value
-    # Compute the average of all pairwise SMC values
-    avg_smc = np.mean(list(pairwise_smc_values.values()))
-    return avg_smc
-df_agree_sub = df.groupby(['story']).apply(sub_simpleMatch)
-df_agree_sub.mean(axis=0)
-
-# split into errors
-df_agree_sub = df.groupby(['story','type of error']).apply(sub_simpleMatch)
-print('confab_mean',(df_agree_sub.iloc[0]+df_agree_sub.iloc[2]+df_agree_sub.iloc[4]+df_agree_sub.iloc[6])/4)
-print('conflict_mean',(df_agree_sub.iloc[1]+df_agree_sub.iloc[3]+df_agree_sub.iloc[5]+df_agree_sub.iloc[7])/4)
-
-print('averaging four stories', df_agree_sub.mean(axis=0))
-
-
-"count number of unique trials"
-confab = []
-conflict = []
-for story_id in story_ids:
-    trial_excel = pd.read_excel('./D. human_validation/validation_exp_Feb2025/trial_excels/%s_agreement.xlsx' % story_id)
-    conflict.append(trial_excel['type of error'].value_counts()['conflict'])
-    confab.append(trial_excel['type of error'].value_counts()['confab'])
-
-print('confab trials',np.sum(confab),'conflict trials',np.sum(conflict))
-
 """
 boostrapping for significance and CI in plots
 note: CI overlap is not a reliable way to check significance,
@@ -283,25 +178,6 @@ def two_sided_bootstrap_p_value(obs_diff, dist_diff):
         p_two_sided = 1.0
 
     return p_two_sided
-
-# individual stories
-for story in story_ids:
-    subdf = df.loc[df.story==story]
-    df_wide = subdf.pivot(index='question_id', columns='participant', values='agreeAI')
-    ratings = df_wide.to_numpy()
-    ai_data = ratings
-    hh_data = make_hh_agreement_matrix(ratings)
-    res = bootstrap_compare(ai_data, hh_data, B=2000, random_state=42)
-
-    ci_ai = get_bootstrap_ci(res['dist_ai_human'])
-    ci_hh = get_bootstrap_ci(res['dist_hh'])
-    ci_diff = get_bootstrap_ci(res['dist_diff'])
-    p_val = two_sided_bootstrap_p_value(res['obs_diff'], res['dist_diff'])
-    print(story)
-    print("AI–Human agreement: obs =", np.round(res['obs_ai_human'],3), ", 95% CI =", np.round(ci_ai,3))
-    print("Human–Human agreement: obs =", np.round(res['obs_hh'],3), ", 95% CI =", np.round(ci_hh,3))
-    print("Difference: obs =", np.round(res['obs_diff'],3), ", 95% CI = ", np.round(ci_diff,3))
-    print("P-value for difference =", np.round(p_val,3))
 
 """
 compute confab vs conflict, grouping all stories

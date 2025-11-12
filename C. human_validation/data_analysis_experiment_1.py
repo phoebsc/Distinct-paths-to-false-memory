@@ -3,22 +3,13 @@ import numpy as np
 import matplotlib
 import pandas as pd
 matplotlib.use('TkAgg')
-path = './D. human_validation/validation_exp_Sept2024\data/false-memory-rating-default-rtdb-export-1014.json'
+path = '\Experiment_1\data/experiment1_data.json'
 with open(path,  encoding='utf-8') as f:
-    d = json.load(f)
-path2 = './D. human_validation/validation_exp_March2025\data/false-memory-rating-default-rtdb-export-0610.json'
-with open(path2,  encoding='utf-8') as f:
-    d2 = json.load(f)
-# combining data from Sept 2024
-# 041 was removed due 2 in understanding
+    data = json.load(f)
 subject_list1 = ['002','003','004','005','006','007','008','009','010']
 subject_list2 = ['0'+str(i) for i in range(22,41)]+['042']
 subject_list_first = ['002','003','004','005','006','007','008','009','010','039','040','042','045','046']
 subject_list_last = ['0'+str(i) for i in range(22,39)]
-
-data1 = [sub for sub in d.items() if sub[0] in subject_list1]
-data2 = [sub for sub in d2.items() if sub[0] in subject_list2]
-data = data1 + data2
 
 data_first = [sub for sub in data if sub[0] in subject_list_first]
 data_last = [sub for sub in data if sub[0] in subject_list_last]
@@ -76,17 +67,7 @@ for sub in data_last:
 oregon_answers = np.array(oregon_answers)
 baseball_answers = np.array(baseball_answers)
 all_answers = np.concatenate([pieman_answers,eyespy_answers], axis=1)
-"""
-demographic
-"""
-year = []
-gender = []
-for sub in data_first+data_last:
-    try:
-        gender.append(sub[1]['data'][1]['response']['gender'])
-        year.append(2024-int(sub[1]['data'][1]['response']['birth_year']))
-    except:
-        print(sub[0])
+
 """
 compute mean and SE agreement
 """
@@ -185,10 +166,10 @@ def two_sided_bootstrap_p_value(obs_diff, dist_diff):
     return p_two_sided
 
 # Split between acc/inacc trials
-pieman_ground = np.array(pd.read_excel('./D. human_validation/validation_exp_Sept2024/trial_excels/pieman.xlsx')['false_mem'])
-eyespy_ground = np.array(pd.read_excel('./D. human_validation/validation_exp_Sept2024/trial_excels/eyespy.xlsx')['false_mem'])
-oregon_ground = np.array(pd.read_excel('./D. human_validation/validation_exp_Sept2024/trial_excels/oregontrail.xlsx')['false_mem'])
-baseball_ground = np.array(pd.read_excel('./D. human_validation/validation_exp_Sept2024/trial_excels/baseball.xlsx')['false_mem'])
+pieman_ground = np.array(pd.read_excel('PATH_TO/experiment_1/stimuli_sheets/pieman.xlsx')['false_mem'])
+eyespy_ground = np.array(pd.read_excel('PATH_TO/experiment_1/stimuli_sheets/eyespy.xlsx')['false_mem'])
+oregon_ground = np.array(pd.read_excel('PATH_TO/experiment_1/stimuli_sheets/oregontrail.xlsx')['false_mem'])
+baseball_ground = np.array(pd.read_excel('PATH_TO/experiment_1/stimuli_sheets/baseball.xlsx')['false_mem'])
 
 # individual stories
 means = np.zeros((4,2,2))  # stories, accurate/inaccurate, ai/human
@@ -226,7 +207,7 @@ for i, (ground, answers) in enumerate(zip([pieman_ground,eyespy_ground,oregon_gr
         print("Difference: obs =", np.round(res['obs_diff'],3), ", 95% CI = ", np.round(ci_diff,3))
         print("P-value for difference =", np.round(p_val,3))
 
-# === NEW: aggregated Option-B CIs per condition (averaging bootstrap draws across stories) ===
+# === aggregated CIs per condition (averaging bootstrap draws across stories) ===
 for cond_i, condition in enumerate(['acc','inacc']):
     # stack to (n_stories, B)
     dist_ai_mat  = np.stack(agg_dists[condition]['ai'],   axis=0)
@@ -284,101 +265,3 @@ for cond_i, condition in enumerate(['acc','inacc']):
     print(f"Mean observed effect: {obs_mean:.3f}")
     print(f"95% CI on mean effect: ({ci_mean[0]:.3f}, {ci_mean[1]:.3f})")
     print(f"Two‐sided p-value: {p_two:.3f}")
-"""
-stats across stories
-"""
-conds = ['acc', 'inacc']
-B = 2000
-for condition in conds:
-    # storage for this condition
-    obs_diffs = []
-    dist_diffs = []
-    for i, (ground, answers) in enumerate(zip([pieman_ground,eyespy_ground,oregon_ground,baseball_ground],
-                                              [pieman_answers,eyespy_answers,oregon_answers,baseball_answers])):
-        if condition =='acc':
-            ratings = 1 - answers[:,~ground,0]  # person x questions
-        else:
-            ratings = 1 - answers[:,ground,0]  # person x questions
-        ai_data = ratings
-        hh_data = make_hh_agreement_matrix(ratings)
-        res = bootstrap_compare(ai_data, hh_data, B=2000, random_state=42)
-        ci_ai = get_bootstrap_ci(res['dist_ai_human'])
-        ci_hh = get_bootstrap_ci(res['dist_hh'])
-        ci_diff = get_bootstrap_ci(res['dist_diff'])
-        p_val = two_sided_bootstrap_p_value(res['obs_diff'], res['dist_diff'])
-        # append
-        obs_diffs.append(res['obs_diff'])
-        dist_diffs.append(res['dist_diff'])
-        # 2) Hierarchical bootstrap across stories for this condition
-    np.random.seed(42)
-    boot_means = np.empty(B)
-    for b in range(B):
-        # pick one bootstrap draw per story and average
-        draws = [dist[np.random.randint(0, B)] for dist in dist_diffs]
-        boot_means[b] = np.mean(draws)
-
-    obs_mean = np.mean(obs_diffs)
-    ci_mean = get_bootstrap_ci(boot_means)
-
-    # two‐sided p‐value for the mean effect
-    if obs_mean > 0:
-        p_one = np.mean(boot_means <= 0)
-    else:
-        p_one = np.mean(boot_means >= 0)
-    p_two = min(1.0, 2 * p_one)
-
-    print(f"\n=== [{condition.upper()}] Hierarchical Bootstrap ===")
-    print(f"Mean observed effect: {obs_mean:.3f}")
-    print(f"95% CI on mean effect: ({ci_mean[0]:.3f}, {ci_mean[1]:.3f})")
-    print(f"Two‐sided p-value: {p_two:.3f}\n")
-
-"""
-compare the groups (between true and false trials)
-"""
-
-B = 2000
-
-# 1) Collect per-story results
-obs_diff = {c: [] for c in conds}
-dist_diff = {c: [] for c in conds}
-
-for condition in conds:
-    # storage for this condition
-    obs_diffs = []
-    dist_diffs = []
-    for i, (ground, answers) in enumerate(zip([pieman_ground, eyespy_ground, oregon_ground, baseball_ground],
-                                              [pieman_answers, eyespy_answers, oregon_answers, baseball_answers])):
-        if condition == 'acc':
-            ratings = 1 - answers[:, ~ground, 0]  # person x questions
-        else:
-            ratings = 1 - answers[:, ground, 0]  # person x questions
-        R = ratings
-        res = bootstrap_compare(R, make_hh_agreement_matrix(R), B=B, random_state=42)
-
-        obs_diff[condition].append(res['obs_diff'])
-        dist_diff[condition].append(res['dist_diff'])
-
-# 2) Hierarchical bootstrap for “difference of gaps”
-np.random.seed(42)
-boot_deltas = np.empty(B)
-for b in range(B):
-    # sample one draw per story for each condition
-    mean_conflict = np.mean([dist[np.random.randint(0,B)] for dist in dist_diff['acc']])
-    mean_confab = np.mean([dist[np.random.randint(0,B)] for dist in dist_diff['inacc']])
-    boot_deltas[b] = mean_conflict - mean_confab
-
-# 3) Observed “difference of means”
-obs_delta = np.mean(obs_diff['acc']) - np.mean(obs_diff['inacc'])
-
-# 4) p-value and CI
-if obs_delta > 0:
-    p_one = np.mean(boot_deltas <= 0)
-else:
-    p_one = np.mean(boot_deltas >= 0)
-p_two = min(1, 2 * p_one)
-ci_delta = get_bootstrap_ci(boot_deltas)
-
-print("=== Condition‐Gap Comparison ===")
-print(f"Observed Δ = {obs_delta:.3f}")
-print(f"95% CI = ({ci_delta[0]:.3f}, {ci_delta[1]:.3f})")
-print(f"Two‐sided p = {p_two:.3f}")
