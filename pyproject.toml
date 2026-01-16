@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "distinct-paths-to-false-memory"
+version = "0.1.0"
+description = "Analysis pipeline for 'Distinct paths to false memory revealed in hundreds of narrative recalls'"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Phoebe Chen"},
+    {name = "Omri Raccah"},
+    {name = "Vy Vo"},
+    {name = "David Poeppel"},
+    {name = "Todd Gureckis"},
+]
+
+dependencies = [
+    "pandas>=1.5.0",
+    "numpy>=1.21.0",
+    "tiktoken>=0.4.0",
+    "langchain>=0.0.200",
+    "openai>=1.0.0",
+    "sentence-transformers>=2.2.0",
+    "transformers>=4.20.0",
+    "torch>=1.12.0",
+    "scikit-learn>=1.1.0",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "scipy>=1.9.0",
+    "openpyxl>=3.0.0",
+    "xlsxwriter>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=0.990",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/phoebsc/Distinct-paths-to-false-memory"
+Repository = "https://github.com/phoebsc/Distinct-paths-to-false-memory.git"
+"OSF Data" = "https://osf.io/cmxae/"
+"Paper" = "https://osf.io/sfqea_v1"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=0.990",
+    "jupyter>=1.0.0",
+    "ipykernel>=6.0.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311"]
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
