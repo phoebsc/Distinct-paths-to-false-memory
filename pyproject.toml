@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Analysis pipeline for 'Distinct paths to false memory revealed in hundreds of narrative recalls'"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 authors = [
     {name = "Phoebe Chen"},
     {name = "Omri Raccah"},
@@ -21,7 +21,7 @@ dependencies = [
     "pandas>=1.5.0",
     "numpy>=1.21.0",
     "tiktoken>=0.4.0",
-    "langchain>=0.0.200",
+    "langchain>=0.0.316",
     "openai>=1.0.0",
     "sentence-transformers>=2.2.0",
     "transformers>=4.20.0",
@@ -66,7 +66,7 @@ target-version = ["py38", "py39", "py310", "py311"]
 include = '\.pyi?$'
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
