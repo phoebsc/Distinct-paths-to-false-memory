@@ -6,6 +6,12 @@ Human data used for analysis are hosted separately on the [OSF repo](https://osf
 
 Authors: Phoebe Chen, Omri Raccah (co-first), Vy Vo, David Poeppel, Todd Gureckis
 
+# Installation
+  ## Install all dependencies
+  uv sync
+
+  ## Run Python with the project environment
+  uv run python script.py
 ---
 
 ## 📊 `A. script_prompting/`
