@@ -1,0 +1,9 @@
+{
+  "n_samples": 2304582,
+  "original_dim": 768,
+  "pca_dim": 50,
+  "n_clusters": 10,
+  "random_state": 42,
+  "tsne_perplexity": 30,
+  "tsne_components": 2
+}
